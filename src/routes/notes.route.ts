@@ -3,7 +3,7 @@ import { ContextExtended } from "../types";
 
 const notes = new Hono();
 
-// TODO: In-Workshop Activities.
+// Get all notes
 notes.get("/", async (ctx: ContextExtended) => {
   const db = ctx.env.DB;
   const notes = await db.prepare("SELECT * FROM note LIMIT 50").run();
@@ -11,7 +11,7 @@ notes.get("/", async (ctx: ContextExtended) => {
   return Response.json(notes.results);
 });
 
-// TODO: In-Workshop Activities.
+// Get single note
 notes.get("/:id", async (ctx: ContextExtended) => {
   const id = ctx.req.path.split("/").slice(-1).join();
   const db = ctx.env.DB;
@@ -23,7 +23,7 @@ notes.get("/:id", async (ctx: ContextExtended) => {
   return Response.json(note);
 });
 
-// TODO: In-Workshop Activities.
+// Create new note
 notes.post("/", async (ctx: ContextExtended) => {
   try {
     const { id, title, description } = await ctx.req.json();
@@ -42,7 +42,7 @@ notes.post("/", async (ctx: ContextExtended) => {
   }
 });
 
-// TODO: In-Workshop Activities.
+// Update existing note
 notes.put("/:id", async (ctx: ContextExtended) => {
   try {
     const id = ctx.req.path.split("/").slice(-1).join();
@@ -65,35 +65,30 @@ notes.put("/:id", async (ctx: ContextExtended) => {
   }
 });
 
-// TODO: In-Workshop Activities.
+// Delete note
 notes.delete("/:id", async (ctx: ContextExtended) => {
   try {
     const id = ctx.req.path.split("/").slice(-1).join();
     const db = ctx.env.DB;
 
-    // Fetch associated file keys
-    const filesResult = await db
-      .prepare("SELECT id FROM file WHERE note_id == ?1")
-      .bind(id)
-      .all();
-
-    const keys = (filesResult.results || []).map((row: any) => row.key);
-
-    // Delete each file from R2
-    await Promise.all(keys.map((key: string) => ctx.env.R2_BUCKET.delete(key)));
-
-    // Delete file records from DB
-    await db.prepare("DELETE FROM file WHERE note_id == ?1").bind(id).run();
-
-    // Delete note
-    const noteResponse = await db
-      .prepare("DELETE FROM note WHERE id == ?1")
+    // First delete associated files
+    const fileResponse = await db
+      .prepare("DELETE FROM file where note_id == ?1")
       .bind(id)
       .run();
 
-    if (noteResponse.meta.changes > 0) {
-      return Response.json({ message: "note deleted" });
+    if (fileResponse.success) {
+      // Then delete the note
+      const noteResponse = await db
+        .prepare("DELETE FROM note where id == ?1")
+        .bind(id)
+        .run();
+
+      return noteResponse.success
+        ? Response.json({ message: "note deleted" })
+        : Response.json({ message: "failed to delete note" });
     } else {
+      console.log("failed to delete note");
       return Response.json({ message: "failed to delete note" });
     }
   } catch (e) {
@@ -101,5 +96,4 @@ notes.delete("/:id", async (ctx: ContextExtended) => {
     return Response.json({ message: `failed to delete note. reason: ${e}` });
   }
 });
-
 export default notes;
