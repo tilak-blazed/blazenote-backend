@@ -1,5 +1,3 @@
--- Migration number: 0001 	 2025-08-05T06:35:17.217Z
-
 -- Migration number: 0001 	 2025-01-26T03:52:41.446Z
 
 -- UUID7 Generation View
